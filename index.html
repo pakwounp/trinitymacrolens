@@ -401,6 +401,15 @@ details.audit summary{cursor:pointer;font-weight:700;min-height:28px;display:fle
   .homebar i{width:130px;height:5px;border-radius:3px;background:#111}
 }
 @media (prefers-reduced-motion:reduce){.ios-noti.drop{animation:none}}
+
+/* phone frame: fixed iPhone size, scroll inside the screen only */
+.phone{display:flex;flex-direction:column;height:min(844px,calc(100vh - 150px));min-height:560px}
+.phone .island,.phone .sbar,.phone .homebar{flex:0 0 auto}
+.pscroll{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;position:relative;scrollbar-width:thin}
+.pscroll::-webkit-scrollbar{width:4px}.pscroll::-webkit-scrollbar-thumb{background:rgba(0,0,0,.25);border-radius:2px}
+@media (max-width:640px){
+  .phone{height:calc(100svh - 212px);min-height:480px;max-height:800px}
+}
 </style>
 </head>
 <body>
@@ -1056,7 +1065,7 @@ function renderClient(){
       <div class="fine">* Simulation based on calculated account data. Pledged shares need cash alongside them for daily settlement; haircut shown is an example.</div></div>
     <div class="cap">Alerts this week: ${alerts} of ${ALERT_CAP}. You get at most one alert per event.</div>
     <div class="tmpl">Message template CT-02 · approved by Compliance</div>`;
-  const nb=document.getElementById('iosNoti'); if(nb) nb.onclick=()=>document.getElementById('appTop').scrollIntoView({behavior:'smooth',block:'start'});
+  const nb=document.getElementById('iosNoti'); if(nb) nb.onclick=()=>{ const ps=document.getElementById('phone'); ps.scrollTo({top:document.getElementById('appTop').offsetTop, behavior:'smooth'}); };
   document.querySelectorAll('.pchip').forEach(b=>b.onclick=()=>{state.cmove=+b.dataset.cm;render();});
   document.querySelectorAll('.optbtn').forEach(b=>b.onclick=()=>{state.open=state.open===b.dataset.o?null:b.dataset.o;render();});
   document.querySelectorAll('.stp').forEach(b=>b.onclick=()=>{state.redN=Math.max(1,Math.min(r.k,state.redN+(+b.dataset.d)));render();});
