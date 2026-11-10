@@ -410,6 +410,45 @@ details.audit summary{cursor:pointer;font-weight:700;min-height:28px;display:fle
 @media (max-width:640px){
   .phone{height:calc(100svh - 110px);min-height:600px;max-height:880px}
 }
+
+/* realistic iPhone body on phones */
+.device{position:relative}
+.device>span{display:none}
+@media (max-width:640px){
+  .device{width:min(84vw,calc((100svh - 215px)/2.05));margin:4px auto 0;flex:0 0 auto}
+  .device>span{display:block;position:absolute;width:3px;border-radius:2px;background:linear-gradient(90deg,#9aa0aa,#d9dce1);z-index:2}
+  .device .btn-l1{left:-4px;top:15%;height:5%}
+  .device .btn-l2{left:-4px;top:23%;height:9%}
+  .device .btn-l3{left:-4px;top:34%;height:9%}
+  .device .btn-r{right:-4px;top:26%;height:13%}
+  .device .phone{width:100%;max-width:none;height:auto;min-height:0;max-height:none;aspect-ratio:1/2.05;margin:0;
+    border:9px solid #0b0d12;border-radius:44px;
+    box-shadow:0 0 0 2px #e4e6ea,0 0 0 3.5px #7d828c,0 0 0 4.5px #c3c7ce,0 16px 34px rgba(0,0,0,.5)}
+  .sbar{height:34px;padding:0 16px 0 22px;font-size:13px}
+  .sbar .isl{top:0;width:44%;height:24px;border-radius:0 0 15px 15px}
+  .sbicons svg{transform:scale(.85)}
+  .pscroll{padding:4px 10px 8px}
+  .lock{margin:-4px -10px 10px;padding:4px 8px 12px}
+  .lk-date{font-size:13px}
+  .lk-time{font-size:54px;margin:0 0 10px}
+  .ios-noti{padding:9px 10px;border-radius:18px;gap:8px}
+  .ios-noti img{flex-basis:32px;height:32px;border-radius:8px}
+  .ios-noti b{font-size:13.5px}.ios-noti .tx{font-size:12.5px}.ios-noti .hd{font-size:10px}
+  .pb-title{font-size:22px}.pb-sub{font-size:12.5px}
+  .att{padding:10px}.att h4{font-size:16px}.att>div{font-size:13px!important}
+  .pcard{padding:10px}.pcard h4{font-size:14px}.pcard>div{font-size:13px!important}
+  .pchip{min-height:36px;font-size:13px}
+  .optbtn{min-height:42px;font-size:14px}
+  .homebar{padding:4px 0 7px}.homebar i{width:38%;height:4px}
+}
+@media (max-width:640px){
+  .sbar .isl{width:38%}
+  .sbar{padding:0 12px 0 20px}
+  .sbicons{gap:3px}
+  .pcard>.fine{font-size:10px!important;line-height:1.35}
+  .pcard>.dimtxt{font-size:12px!important}
+  .cap,.tmpl{font-size:10px}
+}
 </style>
 </head>
 <body>
@@ -578,6 +617,7 @@ details.audit summary{cursor:pointer;font-weight:700;min-height:28px;display:fle
 <section class="view" id="view-client">
   <div class="note-bar" id="clientNote"><span>No approved event yet. Approve tonight's event to see a client alert.</span><button class="goStep2">Go to event review</button></div>
   <div class="clientwrap">
+    <div class="device"><span class="btn-l1"></span><span class="btn-l2"></span><span class="btn-l3"></span><span class="btn-r"></span>
     <div class="phone" aria-label="Client app">
       <div class="island"><i></i></div>
       <div class="sbar" aria-hidden="true"><span id="sbTime"></span><i class="isl"></i><span class="sbicons">
@@ -587,6 +627,7 @@ details.audit summary{cursor:pointer;font-weight:700;min-height:28px;display:fle
       </span></div>
       <div class="pscroll" id="phone"></div>
       <div class="homebar" aria-hidden="true"><i></i></div>
+    </div>
     </div>
     <div class="clientside">
       <h3>Position Brief</h3>
