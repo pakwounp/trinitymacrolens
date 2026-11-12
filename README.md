@@ -12,7 +12,7 @@ Know the risk before the call. Macro Lens shows Trinity's team and its TFEX clie
 | --- | --- | --- |
 | **Event review** | Risk analyst | Monitors scheduled events, market factors and news. AI links an event to the TFEX products it can move; the analyst sets a two-sided stress scenario and approves it once for every account. |
 | **Margin Radar** | Trinity risk team | Ranks every account by how close tonight's scenario takes it to maintenance margin. Call list before the open, a reason per account, follow-up status and an audit trail. |
-| **Client app** | TFEX clients | Position Brief: the client's own buffer, what-if scenarios and options (add funds, pledge stock, reduce, hold, Mini Gold for GF10). |
+| **Client app** | TFEX clients | Position Brief: the client's own buffer, what-if scenarios and options (add funds, pledge stock, reduce, hold). |
 
 The page works on desktop and on iPhone.
 

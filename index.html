@@ -492,6 +492,9 @@ details.audit summary{cursor:pointer;font-weight:700;min-height:28px;display:fle
   .clientside{padding-top:40px}
 }
 @keyframes notiDrop{from{transform:translateY(-140%) scale(.96);opacity:0}to{transform:none;opacity:1}}
+
+.linkbtn.dark{color:var(--blue);padding:8px 0 0;font-weight:600}
+.planchip{font-size:10.5px;font-weight:700;border-radius:999px;padding:2px 8px;background:#e7eefc;color:#2f5bd3;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -570,11 +573,11 @@ details.audit summary{cursor:pointer;font-weight:700;min-height:28px;display:fle
 
 <!-- 03 -->
 <section class="step wide" id="s3">
-  <div class="veil" id="veil">Waiting for analyst approval in step 02.<br>Nothing is calculated on client accounts until the event is approved.</div>
+  <div class="veil" id="veil">Waiting for analyst approval in step 02.<br>No alerts go out until the event is approved. Existing margin-call procedures run as normal.</div>
   <div class="side">
     <div class="pillhead"><span class="num">03</span><b>Assess each account</b></div>
     <div class="caption">Same market move, different account risks<span class="d">Rule-based, verifiable calculations</span></div>
-    <div class="caption"><b style="color:var(--lightblue)">Ranked by risk only</b><span class="d">σ left above MM after the scenario. Never by commission or client value. Click a row.</span></div>
+    <div class="caption"><b style="color:var(--lightblue)">Ranked by risk only</b><span class="d">σ left above MM after the scenario. Never by commission or client value. Alert sent when an account falls below MM or keeps under 1σ in the tested scenario. Click a row.</span></div>
   </div>
   <div class="body">
     <div class="tiles" id="tiles"></div>
@@ -744,7 +747,7 @@ const EVENTS = [
 const FACTORS = [['Gold (spot)','+0.6%','GF10'],['USD/THB','+0.2%','USD Futures, GF10'],['Brent oil','−1.1%','SET50 (energy stocks)'],['US 10-year yield','+4 bp','SET50, GF10'],['SET50 index','−0.8%','SET50 Futures']];
 
 // ---------- State ----------
-let state = { approved:false, approvedAt:null, reapprove:false, eventId:'cpi', sev:'2', customK:2, note:'', excl:{}, panel:null,
+let state = { stale:{}, approved:false, approvedAt:null, reapprove:false, eventId:'cpi', sev:'2', customK:2, note:'', excl:{}, panel:null,
   sel:null, q:'changed', all:false, view:'how', page:'radar', search:'', fprod:'all', fpri:'all', fst:'all', csearch:'',
   cmove:-2, open:null, addAmt:null, pledgeAmt:null, redN:null, contactReq:{} };
 const LOG = [];
@@ -779,10 +782,11 @@ function calc(a, movePct){
   else if (after<fm){status='Below FM · forced close';pri='crit';}
   else if (after<mm){status='Below MM · margin call';pri='high';}
   else if (sigAfter<1){status='Above MM, under 1σ left';pri='med';}
-  else {status='Safe';pri='low';}
+  else {status='Safe in tested scenario';pri='low';}
   return {p, k, side, im, mm, fm, expo, pnl, after, bufNow, sigNow, sigAfter, status, pri, move:movePct};
 }
 function assess(a){
+  if (state.stale[a.p]){ const r=calc(a,0); r.out=true; r.held=true; r.pri='low'; r.status='Held · stale price data'; r.move=null; r.sigAfter=Infinity; return r; }
   if (!inScope(a.p)){ const r=calc(a,0); r.out=true; r.pri='low'; r.status="Not in tonight's scenario"; r.move=null; r.sigAfter=Infinity; return r; }
   const p=PRODUCTS[a.p]; return calc(a, -Math.sign(a.n)*kFor(a.p)*p.sigma);
 }
@@ -791,6 +795,7 @@ const PRI = {crit:['Critical','p-crit'], high:['High','p-high'], med:['Medium','
 const barColor = r => (r.pri==='crit'||r.pri==='high') ? 'var(--red)' : r.pri==='med' ? 'var(--orange)' : 'var(--green)';
 const dirWord = r => r.side>0 ? 'Long' : 'Short';
 function reasonText(r){
+  if (r.held) return 'Alert held until price data is fresh';
   if (r.out) return 'Product not in tonight\'s scenario';
   const d=r.side>0?'long':'short';
   if (r.pri==='crit') return `${d} ${r.k}: a ${pct(r.move)} move takes equity below FM`;
@@ -898,8 +903,17 @@ function renderGate(){
   document.getElementById('mktData').innerHTML = Object.values(PRODUCTS).map(p=>`
     <div class="kvrow"><span>${p.label} price</span><b class="tabnum">${p.price.toLocaleString('en-US',{minimumFractionDigits:p.code==='S50'?2:0})}</b></div>
     <div class="kvrow"><span>Contract value</span><b class="tabnum">${num(notional(p))}</b></div>
-    <div class="kvrow" style="border-bottom:1px solid #e3e7ef;padding-bottom:8px;margin-bottom:4px"><span>IM / MM / FM</span><b class="tabnum">${num(p.im)} / ${num(p.mm)} / ${num(p.fm)}</b></div>`).join('')
-    + `<div class="kvrow"><span>Positions &amp; equity</span><b>${accounts.length} accounts</b></div>`;
+    <div class="kvrow"><span>IM / MM / FM</span><b class="tabnum">${num(p.im)} / ${num(p.mm)} / ${num(p.fm)}</b></div>
+    <div class="kvrow" style="border-bottom:1px solid #e3e7ef;padding-bottom:8px;margin-bottom:4px"><span>Price feed</span>${state.stale[p.code]?`<b class="held">Stale · alerts held</b>`:`<b class="used">Fresh · 16:30</b>`}</div>`).join('')
+    + `<div class="kvrow"><span>Positions &amp; equity</span><b>${accounts.length} accounts</b></div>
+       <div class="kvrow"><span>Margin rates</span><b>Trinity client rates</b></div>
+       <button class="linkbtn dark" id="staleBtn">${state.stale.GF10?'Restore GF10 price feed':'Test: simulate a stale GF10 price'}</button>`;
+  document.getElementById('staleBtn').onclick=()=>{
+    state.stale.GF10=!state.stale.GF10;
+    addLog(state.stale.GF10?'GF10 price feed stale · GF10 alerts held until data is verified':'GF10 price feed verified · alerts resume','System');
+    accounts.forEach(a=>{ if(a.p==='GF10'&&state.stale.GF10) a.alerted=false; });
+    render();
+  };
 }
 
 // ---------- Run bar ----------
@@ -974,7 +988,6 @@ function renderBrief(res){
       <div class="opt"><b>Add funds</b>${gap>0?`About <span class="num-fill">${fmt(gap)}</span> restores equity to the initial margin (${fmt(r.im)}) in this scenario.`:'No top-up needed in this scenario.'}</div>
       <div class="opt"><b>Pledge stock (NCC)</b>${gap>0?`Shares worth about <span class="num-fill">${fmt(pledge)}</span> cover the same gap after a ${HAIRCUT*100}% haircut*. Cash still settles daily losses.`:'Not needed in this scenario.'}</div>
       <div class="opt"><b>Reduce position</b>${reduceText(a,r)}</div>
-      ${a.p==='GF10'?`<div class="opt"><b>Move to Mini Gold</b>One Mini Gold Online contract carries about a fifth of the gold exposure of one GF10. Quoted in USD; eligibility applies.</div>`:''}
       <div class="opt"><b>Hold</b>Equity would be ${fmt(r.after)} against MM ${fmt(r.mm)}.</div>
       <p class="dimtxt" style="margin-top:10px">Risk information only, not buy or sell advice. * Haircut and eligible stocks follow Trinity's collateral list.</p>`;
   }
@@ -1064,10 +1077,15 @@ function renderOverview(res){
       <div class="drow flex" style="padding:6px 0"><span>Margin call</span><b>${cnt('high')}</b></div>
       <div class="drow flex" style="padding:6px 0"><span>Medium (under 1σ left)</span><b>${cnt('med')}</b></div>
       <div class="drow flex" style="padding:6px 0;border:0"><span>Trinity exposure</span><b class="${short>0?'neg':''}">${fmt(short)}</b></div>`:'<p class="dimtxt">Appears after the event is approved.</p>'}</div>
-    <div class="ovcard"><h3>Pilot measures</h3>${state.approved?`
-      <div class="drow flex" style="padding:6px 0"><span>Alerted clients taking timely action<div class="dimtxt">Target ≥ 30% (proposed)</div></span><b>${Math.round(acted/f*100)}%</b></div>
+    <div class="ovcard"><h3>Pilot KPIs · vs control half</h3>${state.approved?`
+      <div class="drow flex" style="padding:6px 0"><span>KPI 1 · Force closes per 1,000 accounts<div class="dimtxt">Back-office force-close log · target lower than control</div></span><b class="dimtxt">Pilot</b></div>
+      <div class="drow flex" style="padding:6px 0"><span>KPI 2 · Alerted clients taking timely action<div class="dimtxt">Before next open · target ≥ 30% (proposed)</div></span><b>${Math.round(acted/f*100)}%</b></div>
+      <div class="drow flex" style="padding:6px 0;border:0"><span>KPI 3 · Revenue per staff member<div class="dimtxt">Commission system · target not lower than control</div></span><b class="dimtxt">Pilot</b></div>`:'<p class="dimtxt">Appears after the event is approved.</p>'}</div>
+    <div class="ovcard"><h3>Business measures</h3>${state.approved?`
+      <div class="drow flex" style="padding:6px 0"><span>Accounts pledging stock (NCC)</span><b>${ncc}</b></div>
       <div class="drow flex" style="padding:6px 0"><span>Flagged accounts reached before the open</span><b>${reached} of ${fl.length}</b></div>
-      <div class="drow flex" style="padding:6px 0;border:0"><span>Accounts pledging stock (NCC)</span><b>${ncc}</b></div>`:'<p class="dimtxt">Appears after the event is approved.</p>'}</div>
+      <div class="drow flex" style="padding:6px 0;border:0"><span>Negative-equity cases in scenario</span><b>${res.filter(x=>x.r.after<0).length}</b></div>
+      <div class="dimtxt" style="margin-top:6px">Also tracked: alert lead time · alert accuracy · 90-day client retention · staff time per account · revenue per contract · TFEX clients with a stock account</div>`:'<p class="dimtxt">Appears after the event is approved.</p>'}</div>
     <div class="ovcard"><h3>Follow-up progress</h3>${state.approved?`
       <div class="prog"><i style="width:${acted/f*100}%;background:#3fa34d"></i><i style="width:${(c(1)+c(5))/f*100}%;background:#3b6ff0"></i></div>
       <div class="dimtxt" style="margin-top:8px">${acted} took action · ${c(1)+c(5)} contacted or holding · ${c(0)} not contacted (of ${fl.length} flagged)</div>`:'<p class="dimtxt">Appears after the event is approved.</p>'}
@@ -1100,8 +1118,8 @@ function renderClient(){
   const a=accounts.find(x=>x.id===id), r=assess(a), p=r.p;
   const flagged = state.approved && !r.out && r.pri!=='low';
   const tone = !flagged ? 'ok' : (r.pri==='crit'||r.pri==='high') ? 'bad' : 'warn';
-  const tag = {bad:'Needs attention', warn:'Watch', ok:'No action needed'}[tone];
-  const headline = {bad:'Low margin buffer', warn:'Margin buffer is thin', ok:'Margin buffer looks healthy'}[tone];
+  const tag = {bad:'Needs attention', warn:'Watch', ok:r.held?'Data check':'Tested scenario'}[tone];
+  const headline = {bad:'Low margin buffer', warn:'Margin buffer is thin', ok:r.held?'Checking price data':'No call in tested scenario'}[tone];
   const share=Math.max(0,Math.min(100,r.bufNow/(r.im-r.mm)*100));
   const gapToMM = r.after - r.mm;
   const pushText = flagged ? `If ${moveSentence(r)} after tonight's ${ev().name.replace(' release','')}, your ${a.p} equity would ${gapToMM>=0?`sit only ${fmt(gapToMM)} above`:`fall ${fmt(-gapToMM)} below`} the margin call level.` : '';
@@ -1124,17 +1142,17 @@ function renderClient(){
   document.getElementById('phone').innerHTML = `
     <div class="lock"><div class="lk-date">${dStr}</div><div class="lk-time">${tStr}</div>${lockNoti}<div class="lk-hint">${flagged?'Tap the notification to open':''}</div></div>
     <div id="appTop"></div>
-    ${flagged && a.alerted ? `<div class="push"><img class="bell" src="${LOGO}" alt="" width="34" height="34"><div style="flex:1"><div style="display:flex;justify-content:space-between"><b>Trinity Macro Lens</b><small>${state.approvedAt}</small></div><b>${a.p} Margin Risk Alert</b><div style="font-size:13px">${pushText}</div><small>What-if scenario · Add funds · Pledge stock${a.p==='GF10'?' · Move to Mini Gold':' · Reduce'}</small></div></div>`:''}
+    ${flagged && a.alerted ? `<div class="push"><img class="bell" src="${LOGO}" alt="" width="34" height="34"><div style="flex:1"><div style="display:flex;justify-content:space-between"><b>Trinity Macro Lens</b><small>${state.approvedAt}</small></div><b>${a.p} Margin Risk Alert</b><div style="font-size:13px">${pushText}</div><small>What-if scenario · Add funds · Pledge stock · Reduce position</small></div></div>`:''}
     ${flagged && !a.alerted ? `<div class="push"><div style="font-size:13px">Weekly alert limit reached. Your Trinity team will call you about tonight's event.</div></div>`:''}
     <div class="pb-title">Position Brief</div>
     <div class="pb-sub">Your account risk explained · ${a.id}</div>
     <div class="att ${tone}"><span class="tag">${tag}</span><h4>${headline}</h4>
-      <div style="font-size:14px">${flagged ? `If ${moveSentence(r)} at the next open, your equity would be <span class="num-fill">${fmt(r.after)}</span>: ${r.after<0?'below zero, the shortfall would be owed':lcf(r.status)}.` : 'Your equity is above maintenance margin with room for a normal move.'}</div>
+      <div style="font-size:14px">${flagged ? `If ${moveSentence(r)} at the next open, your equity would be <span class="num-fill">${fmt(r.after)}</span>: ${r.after<0?'below zero, the shortfall would be owed':lcf(r.status)}.` : (r.held ? 'Price data for this product is being verified. Alerts are held until it is fresh.' : `Your equity stays above maintenance margin in tonight's tested scenario. This is not a guarantee: a larger move could still trigger a margin call.`)}</div>
       <div style="font-size:12px;color:var(--ink2);margin-top:8px">Remaining buffer above MM: ${fmt(r.bufNow)} (${sg(r.sigNow)})</div>
       <div class="track" style="margin-top:4px;height:10px"><i style="width:${share}%;background:${flagged?barColor(r):'var(--green)'}"></i></div>
     </div>
     <div class="pcard"><h4>Why it matters</h4><div style="font-size:14px">${dirWord(r)} ${r.k} × ${a.p}. A move of about ${(r.sigNow*p.sigma).toFixed(1)}% against you on ${p.und} reaches the margin call level.</div></div>
-    <div class="pcard"><h4>What-if scenarios</h4>
+    <div class="pcard"><h4 style="display:flex;justify-content:space-between;gap:6px">What-if scenarios<span class="planchip">Full service</span></h4>
       <div class="pchips">${[-2,-1,1,2].map(m=>`<button class="pchip${state.cmove===m?' sel':''}" data-cm="${m}">${pct(m)}</button>`).join('')}</div>
       <div style="font-size:14px">If ${p.und} moves ${pct(state.cmove)}: P&amp;L <b class="${c.pnl<0?'neg':'pos'}">${fmt(c.pnl)}</b> · equity ${fmt(c.after)}<sup>*</sup><br><span class="dimtxt">${c.after<0?'Below zero · the shortfall would be owed':c.status}</span></div>
       <div class="dimtxt" style="margin-top:6px">Scenarios, not forecasts.</div></div>
@@ -1142,7 +1160,6 @@ function renderClient(){
       ${acc('add','Add funds',`<label for="addAmt">Amount to add</label><input type="range" id="addAmt" min="0" max="${addMax}" step="1000" value="${state.addAmt}"><div id="addRes"></div>`)}
       ${acc('pledge','Pledge stock (NCC)',`<label for="pledgeAmt">Market value of shares to pledge</label><input type="range" id="pledgeAmt" min="0" max="${pledgeMax}" step="5000" value="${state.pledgeAmt}"><div id="pledgeRes"></div>`)}
       ${acc('reduce','Reduce position',`<div class="stepper"><span>Contracts to close</span><button class="stp" data-d="-1" aria-label="Close fewer contracts">−</button><b>${state.redN} of ${r.k}</b><button class="stp" data-d="1" aria-label="Close more contracts">+</button></div><div id="redRes"></div>`)}
-      ${a.p==='GF10'?acc('mini','Move to Mini Gold',`<div class="simrow"><span>Gold per contract</span><b>GF10 10 baht · Mini Gold ≈ 2 baht</b></div><div class="simrow"><span>Exposure per contract<sup>*</sup></span><b>${fmt(notional(p))} → about ${fmt(notional(p)/5)}</b></div><div class="dimtxt" style="margin-top:6px">Mini Gold Online is quoted in USD. Product and account eligibility apply.</div>`):''}
       ${acc('hold','Hold',`<div class="simrow"><span>Equity after tonight's scenario<sup>*</sup></span><b class="${r.after<r.mm?'neg':'pos'}">${fmt(r.after)}</b></div><div class="simrow"><span>Maintenance margin</span><b>${fmt(r.mm)}</b></div><div class="simverdict ${r.after<r.mm?'neg':'pos'}">${r.after<0?'Below zero · shortfall owed':r.status}<sup>*</sup></div>`)}
       <button class="btnp" id="contactStaff" style="margin-top:12px">${state.contactReq[a.id]?'Request sent · your Trinity team will call':'Talk to Trinity staff'}</button>
       <div class="dimtxt" style="margin-top:8px">Review the trade-offs before deciding. Not buy or sell advice.</div>
